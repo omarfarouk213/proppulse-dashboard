@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PropPulse AI v4.6 — Advanced Blob Audio & Sync</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { background-color: #060911; color: #F8FAFC; overflow: hidden; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #060911; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    .glass-card {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.85) 0%, rgba(10, 15, 29, 0.9) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+    .active-lead-card {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.22) 0%, rgba(15, 23, 42, 0.95) 100%);
+      border-color: rgba(99, 102, 241, 0.65);
+      box-shadow: 0 0 20px -5px rgba(99, 102, 241, 0.35);
+    }
+    @keyframes pulseBar {
+      0%, 100% { transform: scaleY(0.35); }
+      50% { transform: scaleY(1); }
+    }
+    .wave-bar-playing { animation: pulseBar 0.85s infinite ease-in-out; }
+  </style>
+</head>
+
+<body class="h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Core HTML5 Audio Player -->
+  <audio id="realAudioPlayer" preload="auto"></audio>
+
+  <!-- ================= TOP NAVBAR ================= -->
+  <header class="h-16 border-b border-slate-800/80 bg-[#080C17] px-6 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-emerald-400 p-[1.5px] shadow-lg shadow-indigo-500/20">
+        <div class="w-full h-full bg-[#080C17] rounded-[10px] flex items-center justify-center">
+          <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 12 2.1 9.1"/><path d="m12 12 6.4 7.6"/>
+          </svg>
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="font-extrabold text-base tracking-tight text-white">PropPulse <span class="text-indigo-400">AI</span></span>
+          <span class="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">BLOB FETCH v4.6</span>
+        </div>
+        <p class="text-[11px] text-slate-400">Perfect Audio Duration & Precise AI Bookmarking</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button type="button" id="btnRefreshLeads" class="flex items-center gap-2 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 px-3.5 py-2 rounded-lg border border-emerald-500/40 font-bold transition active:scale-95 cursor-pointer">
+        <span id="refreshSpinner">🔄</span>
+        <span>Sync from n8n Sheet</span>
+      </button>
+
+      <div class="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="text-xs text-slate-400">Queue:</span>
+        <span id="pendingCount" class="text-xs font-mono font-bold text-white">0 Leads</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN WORKSPACE ================= -->
+  <main class="flex-1 grid grid-cols-12 overflow-hidden">
+
+    <!-- COLUMN 1: QUEUE -->
+    <aside class="col-span-12 lg:col-span-3 border-r border-slate-800/80 bg-[#070B14] flex flex-col overflow-hidden">
+      <div class="p-4 border-b border-slate-800/80 space-y-3">
+        <input id="searchInput" type="text" placeholder="🔍 Search address, owner..." 
+          class="w-full bg-slate-900/90 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition">
+        <div class="grid grid-cols-3 gap-1.5 text-[11px]">
+          <button type="button" data-tier="ALL" class="tier-btn py-1.5 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 font-semibold transition">All</button>
+          <button type="button" data-tier="HOT" class="tier-btn py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white border border-slate-800 transition">🔥 Hot</button>
+          <button type="button" data-tier="FLAG" class="tier-btn py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white border border-slate-800 transition">⚠️ Flags</button>
+        </div>
+      </div>
+      <div id="leadQueueContainer" class="flex-1 overflow-y-auto p-3 space-y-2.5"></div>
+    </aside>
+
+    <!-- COLUMN 2: 4 PILLARS & FINANCIAL ANALYSIS -->
+    <section class="col-span-12 lg:col-span-5 border-r border-slate-800/80 bg-[#090D18] overflow-y-auto p-5 space-y-5">
+      <div class="glass-card rounded-2xl p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5 mb-2">
+              <span id="activeTierBadge" class="px-2.5 py-0.5 text-[11px] font-bold rounded-md"></span>
+              <span id="activeCallTime" class="text-xs font-mono text-slate-400"></span>
+            </div>
+            <h1 id="activeAddress" class="text-xl font-extrabold text-white tracking-tight"></h1>
+            <p id="activeCityState" class="text-xs text-slate-400 mt-1 font-medium"></p>
+          </div>
+          <a id="zillowExternalLink" href="#" target="_blank" class="shrink-0 flex items-center gap-1.5 text-xs bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 px-3.5 py-2 rounded-xl font-semibold transition">
+            <span>Open Zillow</span>
+            <span>↗</span>
+          </a>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-3 gap-3">
+          <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Homeowner</span>
+            <span id="activeOwner" class="font-bold text-sm text-white mt-1 block truncate"></span>
+          </div>
+          <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Cold Caller</span>
+            <span id="activeSetter" class="font-bold text-sm text-indigo-400 mt-1 block truncate"></span>
+          </div>
+          <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Caller ID</span>
+            <span id="activeSkipTrace" class="font-bold text-xs mt-1.5 block truncate text-emerald-400"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3.5">
+          <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+            Financial Spread & Market Value Analysis
+          </h2>
+          <span id="activeSpecs" class="text-[11px] font-mono text-indigo-300 bg-indigo-950/60 px-2.5 py-0.5 rounded border border-indigo-500/20"></span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3.5">
+          <div class="bg-[#0B101E] border border-slate-800 rounded-xl p-4">
+            <span class="text-[11px] font-medium text-slate-400">Asking Price</span>
+            <div id="activeAskingPrice" class="text-2xl font-mono font-extrabold text-white mt-1"></div>
+            <span class="text-[10px] text-slate-500 mt-0.5 block">Stated on call</span>
+          </div>
+          <div class="bg-[#0B101E] border border-slate-800 rounded-xl p-4">
+            <span class="text-[11px] font-medium text-slate-400">Est. Market Value</span>
+            <div id="activeZestimate" class="text-2xl font-mono font-extrabold text-indigo-400 mt-1"></div>
+            <span class="text-[10px] text-slate-500 mt-0.5 block">Comp Analysis</span>
+          </div>
+          <div class="bg-emerald-950/25 border border-emerald-500/40 rounded-xl p-4">
+            <span class="text-[11px] font-semibold text-emerald-300">Spread</span>
+            <div id="activeSpread" class="text-xl font-mono font-extrabold text-emerald-400 mt-1"></div>
+            <span id="activeMao" class="text-[10px] font-mono text-emerald-300/80 mt-0.5 block"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-300">
+            ✨ AI 4-Pillars Qualification Breakdown
+          </h2>
+          <span id="activeMotivationScore" class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"></span>
+        </div>
+
+        <div class="glass-card rounded-xl p-4">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-bold text-indigo-400">1. Motivation & Reason to Sell</span>
+            <span id="pillarMotivationTag" class="text-[11px] font-mono bg-slate-800/90 text-slate-300 px-2 py-0.5 rounded"></span>
+          </div>
+          <p id="pillarMotivationText" class="text-xs text-slate-200 leading-relaxed"></p>
+          <div id="pillarMotivationQuote" class="mt-2.5 p-2.5 rounded-lg bg-slate-900/90 border-l-4 border-indigo-500 text-[11px] italic text-slate-300"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="glass-card rounded-xl p-4">
+            <span class="text-xs font-bold text-amber-400 block mb-1.5">2. Property Condition</span>
+            <p id="pillarConditionText" class="text-xs text-slate-200 leading-relaxed"></p>
+          </div>
+          <div class="glass-card rounded-xl p-4">
+            <span class="text-xs font-bold text-cyan-400 block mb-1.5">3. Closing Timeline</span>
+            <p id="pillarTimelineText" class="text-xs text-slate-200 leading-relaxed"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMN 3: AUDIO & DECISION -->
+    <section class="col-span-12 lg:col-span-4 bg-[#070B14] overflow-y-auto p-5 flex flex-col justify-between space-y-5">
+      <div class="space-y-5">
+        <!-- LIVE AUDIO PLAYER -->
+        <div class="glass-card rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+              Call Audio Stream
+            </span>
+            <span id="audioStreamBadge" class="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">Waiting</span>
+          </div>
+
+          <div class="bg-[#0B101E] border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="flex items-center gap-3.5">
+              <button type="button" id="playPauseBtn" class="w-12 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 transition shrink-0 font-bold text-lg cursor-pointer">
+                ▶
+              </button>
+              <div class="flex-1 space-y-2">
+                <div id="waveformContainer" class="h-7 flex items-end gap-[3px] pt-1"></div>
+                <!-- Smooth Range Input -->
+                <input id="audioScrubber" type="range" min="0" max="1000" value="0" step="1"
+                  class="w-full accent-indigo-500 bg-slate-800 h-2 rounded-lg cursor-pointer block" disabled>
+              </div>
+            </div>
+            <div class="flex justify-between items-center text-[11px] font-mono">
+              <span id="currentAudioTime" class="text-slate-400 font-bold">00:00</span>
+              <span id="activeJumpStatus" class="text-indigo-400 font-semibold truncate max-w-[170px]">Ready</span>
+              <span id="audioDurationLabel" class="text-slate-400">00:00</span>
+            </div>
+          </div>
+
+          <div>
+            <span class="text-[11px] font-semibold text-slate-400 block mb-2">⚡ AI Bookmarked Moments (Click to Jump):</span>
+            <div id="bookmarksContainer" class="grid grid-cols-2 gap-2"></div>
+          </div>
+        </div>
+
+        <div id="setterAlertBox" class="rounded-xl p-4 border">
+          <div class="text-xs font-extrabold uppercase tracking-wide mb-1" id="setterAlertTitle"></div>
+          <p id="setterAlertText" class="text-xs leading-relaxed"></p>
+        </div>
+
+        <!-- QA NOTES -->
+        <div class="glass-card rounded-2xl p-4 space-y-2">
+          <label class="text-xs font-extrabold uppercase tracking-wider text-slate-300 block">
+            📝 QA Auditor Notes
+          </label>
+          <textarea id="qaNotesInput" rows="2" placeholder="Notes for Acquisitions..."
+            class="w-full bg-[#0B101E] border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
+        </div>
+      </div>
+
+      <!-- FINAL ACTIONS -->
+      <div class="pt-3 border-t border-slate-800/80 space-y-2">
+        <div class="grid grid-cols-2 gap-3">
+          <button type="button" id="btnApproveLead" class="py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition active:scale-95 cursor-pointer">
+            <span>✓ Approve (A)</span>
+          </button>
+          <button type="button" id="btnRejectLead" class="py-3.5 px-4 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer">
+            <span>✕ Reject (R)</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const RAILWAY_BASE = "https://primary-production-25f9a.up.railway.app";
+    const DEFAULT_GET_URL = `${RAILWAY_BASE}/webhook/get-pending-leads`;
+
+    // FALLBACK DEMO DATA TO PREVENT BLANK UI ON LOAD
+    let leadsData = [
+      {
+        id: "lead_demo_01",
+        tier: "WARM",
+        tierLabel: "🟡 WARM INHERITED LAND",
+        callTime: "Local Demo Mode",
+        address: "6541 General Lee Road",
+        cityState: "Jacksonville, FL, 32254",
+        owner: "Walter Rantley",
+        phone: "904-266-3101",
+        setter: "Tarek Omar (ag_108)",
+        buid: "8090101",
+        skipTraceMatch: true,
+        skipTraceText: "Verified Owner",
+        specs: "6.7 Acres Land",
+        askingPrice: 405000,
+        zestimate: 518400,
+        repairsEst: 25000,
+        motivationScore: "8.5 / 10",
+        motivationTag: "Inherited Probate",
+        motivationText: "Property inherited; considering selling land.",
+        motivationQuote: "\"I inherited.\"",
+        conditionText: "6.7 acres of land, no access to utilities.",
+        timelineText: "Plenty of time; two months is enough.",
+        setterFlag: false,
+        setterAlertTitle: "Compliance status: MET",
+        setterAlertText: "Setter followed script; homeowner engaged without reluctance.",
+        bookmarks: [
+          { label: "Property Condition", sec: 75, timeStr: "01:15" },
+          { label: "Asking Price ($405k)", sec: 218, timeStr: "03:38" }
+        ],
+        audioUrl: ""
+      }
+    ];
+
+    let currentFilter = 'ALL';
+    let activeLeadId = null;
+    let isDraggingScrubber = false;
+    let currentObjectUrl = null;
+
+    const audioEl = document.getElementById('realAudioPlayer');
+    const scrubberEl = document.getElementById('audioScrubber');
+
+    function formatMoney(num) {
+      return '$' + (Number(num) || 0).toLocaleString('en-US');
+    }
+
+    function formatSeconds(sec) {
+      if (isNaN(sec) || !isFinite(sec)) return '00:00';
+      const s = Math.floor(sec);
+      const m = Math.floor(s / 60).toString().padStart(2, '0');
+      const rem = (s % 60).toString().padStart(2, '0');
+      return `${m}:${rem}`;
+    }
+
+    function buildWaveform() {
+      const container = document.getElementById('waveformContainer');
+      container.innerHTML = '';
+      const heights = [35, 65, 45, 85, 55, 95, 40, 75, 60, 90, 50, 80, 45, 70, 100, 60, 40, 85, 75, 50, 95, 65, 45, 80, 55, 70, 40, 85, 60, 50];
+      heights.forEach((h, i) => {
+        const bar = document.createElement('div');
+        bar.className = 'w-1.5 bg-indigo-500/40 rounded-full transition-all duration-300 wave-bar';
+        bar.style.height = `${h}%`;
+        bar.style.animationDelay = `${(i % 5) * 0.15}s`;
+        container.appendChild(bar);
+      });
+    }
+
+    function setWaveAnimation(playing) {
+      const bars = document.querySelectorAll('.wave-bar');
+      bars.forEach(b => {
+        if (playing) {
+          b.classList.add('wave-bar-playing', 'bg-indigo-400');
+          b.classList.remove('bg-indigo-500/40');
+        } else {
+          b.classList.remove('wave-bar-playing', 'bg-indigo-400');
+          b.classList.add('bg-indigo-500/40');
+        }
+      });
+    }
+
+    function renderLeadList() {
+      const container = document.getElementById('leadQueueContainer');
+      const query = (document.getElementById('searchInput').value || '').toLowerCase();
+      container.innerHTML = '';
+
+      if (leadsData.length === 0) {
+        container.innerHTML = `<div class="text-slate-500 text-xs text-center mt-5">No leads found.</div>`;
+        return;
+      }
+
+      const filtered = leadsData.filter(item => {
+        const tier = (item.tier || 'WARM').toUpperCase();
+        const matchesTier = currentFilter === 'ALL' || tier === currentFilter;
+        const matchesQuery = (item.address || '').toLowerCase().includes(query) ||
+                             (item.owner || '').toLowerCase().includes(query);
+        return matchesTier && matchesQuery;
+      });
+
+      document.getElementById('pendingCount').innerText = `${leadsData.length} Leads`;
+
+      filtered.forEach(item => {
+        const isSelected = item.id === activeLeadId;
+        const ask = parseFloat(item.askingPrice || 0);
+        const zest = parseFloat(item.zestimate || Math.round(ask * 1.28));
+        const spread = zest - ask;
+        const spreadPct = zest > 0 ? Math.round((spread / zest) * 100) : 0;
+        const tier = (item.tier || 'WARM').toUpperCase();
+
+        let badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        if (tier === 'HOT') badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        if (tier === 'FLAG') badgeClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+
+        const card = document.createElement('div');
+        card.onclick = () => selectLead(item.id);
+        card.className = `p-4 rounded-xl border cursor-pointer transition-all ${
+          isSelected ? 'active-lead-card' : 'bg-[#0C1222] border-slate-800/90 hover:border-slate-700'
+        }`;
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded border ${badgeClass}">
+              ${tier === 'HOT' ? '🔥 HOT DEAL' : tier === 'FLAG' ? '⚠️ RED FLAG' : '🟡 WARM DEAL'}
+            </span>
+            <span class="text-[10px] font-mono text-slate-400">${item.callTime || 'Today'}</span>
+          </div>
+          <div class="font-extrabold text-sm text-white truncate">${item.address || 'Unknown Address'}</div>
+          <div class="text-xs text-slate-400 flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-800/60">
+            <span>Owner: <b class="text-slate-200">${item.owner || 'Homeowner'}</b></span>
+            <span class="font-mono font-bold text-emerald-400">-${spreadPct}% Spread</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    async function fetchAudioAsBlob(url) {
+      if (!url) return;
+      const badge = document.getElementById('audioStreamBadge');
+      badge.innerText = 'Fetching Audio...';
+      badge.className = 'text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 animate-pulse';
+      scrubberEl.disabled = true;
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const blob = await response.blob();
+        
+        if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+        currentObjectUrl = URL.createObjectURL(blob);
+        
+        audioEl.src = currentObjectUrl;
+        audioEl.load();
+
+        badge.innerText = 'Audio Ready';
+        badge.className = 'text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30';
+        scrubberEl.disabled = false;
+      } catch (err) {
+        badge.innerText = 'Audio Failed';
+        badge.className = 'text-[10px] font-mono text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30';
+      }
+    }
+
+    function selectLead(id) {
+      activeLeadId = id;
+      const lead = leadsData.find(l => l.id === id);
+      if (!lead) return;
+
+      renderLeadList();
+
+      const tier = (lead.tier || 'WARM').toUpperCase();
+      const badge = document.getElementById('activeTierBadge');
+      badge.innerText = lead.tierLabel || (tier === 'HOT' ? '🔥 HOT WHOLESALE DEAL' : '🟡 WARM DEAL');
+      badge.className = tier === 'HOT'
+        ? 'px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+        : tier === 'FLAG'
+        ? 'px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40'
+        : 'px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40';
+
+      document.getElementById('activeCallTime').innerText = lead.callTime || 'Today';
+      document.getElementById('activeAddress').innerText = lead.address || 'Unknown Address';
+      document.getElementById('activeCityState').innerText = `${lead.cityState || ''} • 📞 ${lead.phone || 'N/A'}`;
+      document.getElementById('activeOwner').innerText = lead.owner || 'Homeowner';
+      document.getElementById('activeSetter').innerText = lead.setter || 'Tarek Omar';
+      document.getElementById('activeSkipTrace').innerText = `🟢 ${lead.skipTraceText || 'Verified'}`;
+
+      const ask = parseFloat(lead.askingPrice || 0);
+      const zest = parseFloat(lead.zestimate || Math.round(ask * 1.28));
+      const spread = zest - ask;
+      const spreadPct = zest > 0 ? Math.round((spread / zest) * 100) : 0;
+      const mao = parseFloat(lead.mao || Math.round((zest * 0.70) - 25000));
+
+      document.getElementById('activeSpecs').innerText = lead.specs || 'Specs not stated';
+      document.getElementById('activeAskingPrice').innerText = formatMoney(ask);
+      document.getElementById('activeZestimate').innerText = formatMoney(zest);
+      document.getElementById('activeSpread').innerText = `-${formatMoney(spread)} (${spreadPct}%)`;
+      document.getElementById('activeMao').innerText = `Est. 70% MAO: ${formatMoney(mao)}`;
+
+      document.getElementById('activeMotivationScore').innerText = `Motivation: ${lead.motivationScore || '8.5 / 10'}`;
+      document.getElementById('pillarMotivationTag').innerText = lead.motivationTag || 'Off-Market';
+      document.getElementById('pillarMotivationText').innerText = lead.motivationText || '';
+      document.getElementById('pillarMotivationQuote').innerText = lead.motivationQuote ? `"${lead.motivationQuote.replace(/^"|"$/g, '')}"` : '—';
+      document.getElementById('pillarConditionText').innerText = lead.conditionText || '';
+      document.getElementById('pillarTimelineText').innerText = lead.timelineText || '';
+
+      const alertBox = document.getElementById('setterAlertBox');
+      const alertTitle = document.getElementById('setterAlertTitle');
+      const alertText = document.getElementById('setterAlertText');
+      const isFlagged = lead.setterFlag === true || lead.setterFlag === 'true';
+
+      alertBox.className = isFlagged
+        ? 'rounded-xl p-4 border bg-rose-950/30 border-rose-500/50 text-rose-200'
+        : 'rounded-xl p-4 border bg-emerald-950/25 border-emerald-500/40 text-emerald-200';
+      alertTitle.className = isFlagged
+        ? 'text-xs font-extrabold uppercase tracking-wide mb-1 text-rose-400'
+        : 'text-xs font-extrabold uppercase tracking-wide mb-1 text-emerald-400';
+
+      alertTitle.innerText = lead.setterAlertTitle || 'Compliance status: MET';
+      alertText.innerText = lead.setterAlertText || '';
+
+      // Reset Audio UI
+      document.getElementById('audioDurationLabel').innerText = '--:--';
+      document.getElementById('currentAudioTime').innerText = '00:00';
+      scrubberEl.value = 0;
+      audioEl.pause();
+
+      if (lead.audioUrl && lead.audioUrl.trim() !== '') {
+        // Fetch audio dynamically to ensure duration is perfectly calculated!
+        fetchAudioAsBlob(lead.audioUrl);
+      } else {
+        audioEl.removeAttribute('src');
+        document.getElementById('audioStreamBadge').innerText = 'No Audio';
+        document.getElementById('audioStreamBadge').className = 'text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded';
+        scrubberEl.disabled = true;
+      }
+
+      // Bookmarks rendering
+      let bms = lead.bookmarks || [];
+      if (typeof bms === 'string') {
+        try { bms = JSON.parse(bms); } catch (e) { bms = []; }
+      }
+
+      const bmContainer = document.getElementById('bookmarksContainer');
+      bmContainer.innerHTML = '';
+      bms.forEach(bm => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const targetSec = Number(bm.sec || 0);
+        btn.onclick = () => jumpToSecond(targetSec, bm.label || 'Clip');
+        btn.className = 'flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#0B101E] hover:bg-indigo-600/20 border border-slate-800 hover:border-indigo-500/50 text-xs transition group cursor-pointer';
+        btn.innerHTML = `
+          <span class="text-slate-200 font-medium group-hover:text-white truncate">${bm.label}</span>
+          <span class="font-mono text-[11px] font-bold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded">${bm.timeStr || formatSeconds(targetSec)}</span>
+        `;
+        bmContainer.appendChild(btn);
+      });
+    }
+
+    function jumpToSecond(sec, label) {
+      if (!audioEl.src) return;
+      if (!isFinite(audioEl.duration) || audioEl.duration === 0) return;
+      
+      audioEl.currentTime = sec;
+      document.getElementById('activeJumpStatus').innerText = `▶ ${label}`;
+      audioEl.play().catch(() => {});
+    }
+
+    function togglePlay() {
+      if (!audioEl.src) return;
+      if (audioEl.paused) {
+        audioEl.play().catch(()=>{});
+      } else {
+        audioEl.pause();
+      }
+    }
+
+    audioEl.addEventListener('play', () => {
+      document.getElementById('playPauseBtn').innerText = '⏸';
+      setWaveAnimation(true);
+    });
+
+    audioEl.addEventListener('pause', () => {
+      document.getElementById('playPauseBtn').innerText = '▶';
+      setWaveAnimation(false);
+    });
+
+    audioEl.addEventListener('loadedmetadata', () => {
+      if (isFinite(audioEl.duration)) {
+        document.getElementById('audioDurationLabel').innerText = formatSeconds(audioEl.duration);
+      }
+    });
+
+    audioEl.addEventListener('timeupdate', () => {
+      if (isDraggingScrubber) return;
+      const cur = audioEl.currentTime || 0;
+      const dur = audioEl.duration || 1;
+      document.getElementById('currentAudioTime').innerText = formatSeconds(cur);
+      if (isFinite(dur) && dur > 0) {
+        scrubberEl.value = Math.floor((cur / dur) * 1000);
+      }
+    });
+
+    scrubberEl.addEventListener('mousedown', () => { isDraggingScrubber = true; });
+    scrubberEl.addEventListener('touchstart', () => { isDraggingScrubber = true; });
+
+    scrubberEl.addEventListener('input', () => {
+      if (audioEl.duration && isFinite(audioEl.duration)) {
+        const targetTime = (scrubberEl.value / 1000) * audioEl.duration;
+        document.getElementById('currentAudioTime').innerText = formatSeconds(targetTime);
+      }
+    });
+
+    scrubberEl.addEventListener('change', () => {
+      if (audioEl.duration && isFinite(audioEl.duration)) {
+        audioEl.currentTime = (scrubberEl.value / 1000) * audioEl.duration;
+      }
+      isDraggingScrubber = false;
+    });
+
+    async function fetchLiveLeads() {
+      const getUrl = DEFAULT_GET_URL;
+      const spinner = document.getElementById('refreshSpinner');
+      spinner.classList.add('animate-spin');
+
+      try {
+        const res = await fetch(getUrl, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const rawData = await res.json();
+        let normalized = [];
+        if (Array.isArray(rawData)) {
+          normalized = rawData.map(item => item.json ? item.json : item);
+        } else if (rawData.json) {
+          normalized = [rawData.json];
+        }
+
+        if (normalized.length > 0) {
+          leadsData = normalized;
+          activeLeadId = leadsData[0].id;
+          renderLeadList();
+          selectLead(activeLeadId);
+        }
+      } catch (e) {
+        console.error('Fetch error:', e);
+      } finally {
+        spinner.classList.remove('animate-spin');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      buildWaveform();
+      selectLead(leadsData[0].id);
+      document.getElementById('btnRefreshLeads').addEventListener('click', fetchLiveLeads);
+      document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+      document.getElementById('searchInput').addEventListener('input', renderLeadList);
+      fetchLiveLeads();
+    });
+  </script>
+</body>
+</html>
