@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PropPulse AI v4.6 — Advanced Blob Audio & Sync</title>
+  <title>PropPulse AI v4.7 — Zero Hallucination Screener</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
@@ -64,9 +64,9 @@
       <div>
         <div class="flex items-center gap-2.5">
           <span class="font-extrabold text-base tracking-tight text-white">PropPulse <span class="text-indigo-400">AI</span></span>
-          <span class="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">BLOB FETCH v4.6</span>
+          <span class="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">AI DIRECT DEPLOY v4.7</span>
         </div>
-        <p class="text-[11px] text-slate-400">Perfect Audio Duration & Precise AI Bookmarking</p>
+        <p class="text-[11px] text-slate-400">Automated QA Screener & Real-Time Deal Evaluator</p>
       </div>
     </div>
 
@@ -147,7 +147,7 @@
         <div class="grid grid-cols-3 gap-3.5">
           <div class="bg-[#0B101E] border border-slate-800 rounded-xl p-4">
             <span class="text-[11px] font-medium text-slate-400">Asking Price</span>
-            <div id="activeAskingPrice" class="text-2xl font-mono font-extrabold text-white mt-1"></div>
+            <div id="activeAskingPrice" class="mt-1"></div>
             <span class="text-[10px] text-slate-500 mt-0.5 block">Stated on call</span>
           </div>
           <div class="bg-[#0B101E] border border-slate-800 rounded-xl p-4">
@@ -157,7 +157,7 @@
           </div>
           <div class="bg-emerald-950/25 border border-emerald-500/40 rounded-xl p-4">
             <span class="text-[11px] font-semibold text-emerald-300">Spread</span>
-            <div id="activeSpread" class="text-xl font-mono font-extrabold text-emerald-400 mt-1"></div>
+            <div id="activeSpread" class="mt-1"></div>
             <span id="activeMao" class="text-[10px] font-mono text-emerald-300/80 mt-0.5 block"></span>
           </div>
         </div>
@@ -213,7 +213,6 @@
               </button>
               <div class="flex-1 space-y-2">
                 <div id="waveformContainer" class="h-7 flex items-end gap-[3px] pt-1"></div>
-                <!-- Smooth Range Input -->
                 <input id="audioScrubber" type="range" min="0" max="1000" value="0" step="1"
                   class="w-full accent-indigo-500 bg-slate-800 h-2 rounded-lg cursor-pointer block" disabled>
               </div>
@@ -264,42 +263,7 @@
     const RAILWAY_BASE = "https://primary-production-25f9a.up.railway.app";
     const DEFAULT_GET_URL = `${RAILWAY_BASE}/webhook/get-pending-leads`;
 
-    // FALLBACK DEMO DATA TO PREVENT BLANK UI ON LOAD
-    let leadsData = [
-      {
-        id: "lead_demo_01",
-        tier: "WARM",
-        tierLabel: "🟡 WARM INHERITED LAND",
-        callTime: "Local Demo Mode",
-        address: "6541 General Lee Road",
-        cityState: "Jacksonville, FL, 32254",
-        owner: "Walter Rantley",
-        phone: "904-266-3101",
-        setter: "Tarek Omar (ag_108)",
-        buid: "8090101",
-        skipTraceMatch: true,
-        skipTraceText: "Verified Owner",
-        specs: "6.7 Acres Land",
-        askingPrice: 405000,
-        zestimate: 518400,
-        repairsEst: 25000,
-        motivationScore: "8.5 / 10",
-        motivationTag: "Inherited Probate",
-        motivationText: "Property inherited; considering selling land.",
-        motivationQuote: "\"I inherited.\"",
-        conditionText: "6.7 acres of land, no access to utilities.",
-        timelineText: "Plenty of time; two months is enough.",
-        setterFlag: false,
-        setterAlertTitle: "Compliance status: MET",
-        setterAlertText: "Setter followed script; homeowner engaged without reluctance.",
-        bookmarks: [
-          { label: "Property Condition", sec: 75, timeStr: "01:15" },
-          { label: "Asking Price ($405k)", sec: 218, timeStr: "03:38" }
-        ],
-        audioUrl: ""
-      }
-    ];
-
+    let leadsData = [];
     let currentFilter = 'ALL';
     let activeLeadId = null;
     let isDraggingScrubber = false;
@@ -368,11 +332,16 @@
 
       filtered.forEach(item => {
         const isSelected = item.id === activeLeadId;
-        const ask = parseFloat(item.askingPrice || 0);
-        const zest = parseFloat(item.zestimate || Math.round(ask * 1.28));
-        const spread = zest - ask;
-        const spreadPct = zest > 0 ? Math.round((spread / zest) * 100) : 0;
+        const ask = (item.askingPrice !== null && !isNaN(item.askingPrice)) ? parseFloat(item.askingPrice) : null;
+        const zest = item.zestimate ? parseFloat(item.zestimate) : null;
         const tier = (item.tier || 'WARM').toUpperCase();
+
+        let spreadLabel = "Open Offer";
+        if (ask !== null && zest && zest > 0) {
+          const spread = zest - ask;
+          const spreadPct = Math.round((spread / zest) * 100);
+          spreadLabel = `-${spreadPct}% Spread`;
+        }
 
         let badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
         if (tier === 'HOT') badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
@@ -394,7 +363,7 @@
           <div class="font-extrabold text-sm text-white truncate">${item.address || 'Unknown Address'}</div>
           <div class="text-xs text-slate-400 flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-800/60">
             <span>Owner: <b class="text-slate-200">${item.owner || 'Homeowner'}</b></span>
-            <span class="font-mono font-bold text-emerald-400">-${spreadPct}% Spread</span>
+            <span class="font-mono font-bold text-emerald-400">${spreadLabel}</span>
           </div>
         `;
         container.appendChild(card);
@@ -448,27 +417,50 @@
       document.getElementById('activeAddress').innerText = lead.address || 'Unknown Address';
       document.getElementById('activeCityState').innerText = `${lead.cityState || ''} • 📞 ${lead.phone || 'N/A'}`;
       document.getElementById('activeOwner').innerText = lead.owner || 'Homeowner';
-      document.getElementById('activeSetter').innerText = lead.setter || 'Tarek Omar';
+      document.getElementById('activeSetter').innerText = lead.setter || 'Cold Caller';
       document.getElementById('activeSkipTrace').innerText = `🟢 ${lead.skipTraceText || 'Verified'}`;
 
-      const ask = parseFloat(lead.askingPrice || 0);
-      const zest = parseFloat(lead.zestimate || Math.round(ask * 1.28));
-      const spread = zest - ask;
-      const spreadPct = zest > 0 ? Math.round((spread / zest) * 100) : 0;
-      const mao = parseFloat(lead.mao || Math.round((zest * 0.70) - 25000));
+      const ask = (lead.askingPrice !== null && !isNaN(lead.askingPrice)) ? parseFloat(lead.askingPrice) : null;
+      const zest = lead.zestimate ? parseFloat(lead.zestimate) : null;
+
+      // 1. Asking Price Handling (No Asking Price vs Stated Price)
+      const askEl = document.getElementById('activeAskingPrice');
+      if (ask !== null && ask > 0) {
+        askEl.innerText = formatMoney(ask);
+        askEl.className = "text-2xl font-mono font-extrabold text-white";
+      } else {
+        askEl.innerText = "No Asking Price";
+        askEl.className = "text-xl font-mono font-extrabold text-amber-400";
+      }
+
+      // 2. Market Value (Always shown)
+      const zestEl = document.getElementById('activeZestimate');
+      zestEl.innerText = zest ? formatMoney(zest) : "Evaluating...";
+
+      // 3. Spread & MAO
+      const spreadEl = document.getElementById('activeSpread');
+      const maoEl = document.getElementById('activeMao');
+
+      if (ask !== null && zest && zest > 0) {
+        const spread = zest - ask;
+        const spreadPct = Math.round((spread / zest) * 100);
+        spreadEl.innerText = `-${formatMoney(spread)} (${spreadPct}%)`;
+        spreadEl.className = "text-xl font-mono font-extrabold text-emerald-400";
+      } else {
+        spreadEl.innerText = "Open for Offer";
+        spreadEl.className = "text-lg font-mono font-extrabold text-cyan-400";
+      }
+
+      const mao = lead.mao || (zest ? Math.round((zest * 0.70) - 25000) : null);
+      maoEl.innerText = mao ? `Target 70% MAO: ${formatMoney(mao)}` : "Analyzing Comps...";
 
       document.getElementById('activeSpecs').innerText = lead.specs || 'Specs not stated';
-      document.getElementById('activeAskingPrice').innerText = formatMoney(ask);
-      document.getElementById('activeZestimate').innerText = formatMoney(zest);
-      document.getElementById('activeSpread').innerText = `-${formatMoney(spread)} (${spreadPct}%)`;
-      document.getElementById('activeMao').innerText = `Est. 70% MAO: ${formatMoney(mao)}`;
-
-      document.getElementById('activeMotivationScore').innerText = `Motivation: ${lead.motivationScore || '8.5 / 10'}`;
+      document.getElementById('activeMotivationScore').innerText = `Motivation: ${lead.motivationScore || 'Pending'}`;
       document.getElementById('pillarMotivationTag').innerText = lead.motivationTag || 'Off-Market';
-      document.getElementById('pillarMotivationText').innerText = lead.motivationText || '';
+      document.getElementById('pillarMotivationText').innerText = lead.motivationText || 'No details stated.';
       document.getElementById('pillarMotivationQuote').innerText = lead.motivationQuote ? `"${lead.motivationQuote.replace(/^"|"$/g, '')}"` : '—';
-      document.getElementById('pillarConditionText').innerText = lead.conditionText || '';
-      document.getElementById('pillarTimelineText').innerText = lead.timelineText || '';
+      document.getElementById('pillarConditionText').innerText = lead.conditionText || 'Condition not mentioned.';
+      document.getElementById('pillarTimelineText').innerText = lead.timelineText || 'Timeline not specified.';
 
       const alertBox = document.getElementById('setterAlertBox');
       const alertTitle = document.getElementById('setterAlertTitle');
@@ -483,7 +475,7 @@
         : 'text-xs font-extrabold uppercase tracking-wide mb-1 text-emerald-400';
 
       alertTitle.innerText = lead.setterAlertTitle || 'Compliance status: MET';
-      alertText.innerText = lead.setterAlertText || '';
+      alertText.innerText = lead.setterAlertText || 'Standard script followed.';
 
       // Reset Audio UI
       document.getElementById('audioDurationLabel').innerText = '--:--';
@@ -492,7 +484,6 @@
       audioEl.pause();
 
       if (lead.audioUrl && lead.audioUrl.trim() !== '') {
-        // Fetch audio dynamically to ensure duration is perfectly calculated!
         fetchAudioAsBlob(lead.audioUrl);
       } else {
         audioEl.removeAttribute('src');
@@ -501,7 +492,7 @@
         scrubberEl.disabled = true;
       }
 
-      // Bookmarks rendering
+      // Bookmarks rendering (Bulletproof)
       let bms = lead.bookmarks || [];
       if (typeof bms === 'string') {
         try { bms = JSON.parse(bms); } catch (e) { bms = []; }
@@ -512,12 +503,15 @@
       bms.forEach(bm => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        const targetSec = Number(bm.sec || 0);
-        btn.onclick = () => jumpToSecond(targetSec, bm.label || 'Clip');
+        const label = bm.label || bm.topic || bm.title || 'Clip';
+        const targetSec = Number(bm.sec ?? bm.timestamp ?? bm.time ?? 0);
+        const timeStr = bm.timeStr || formatSeconds(targetSec);
+
+        btn.onclick = () => jumpToSecond(targetSec, label);
         btn.className = 'flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#0B101E] hover:bg-indigo-600/20 border border-slate-800 hover:border-indigo-500/50 text-xs transition group cursor-pointer';
         btn.innerHTML = `
-          <span class="text-slate-200 font-medium group-hover:text-white truncate">${bm.label}</span>
-          <span class="font-mono text-[11px] font-bold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded">${bm.timeStr || formatSeconds(targetSec)}</span>
+          <span class="text-slate-200 font-medium group-hover:text-white truncate">${label}</span>
+          <span class="font-mono text-[11px] font-bold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded">${timeStr}</span>
         `;
         bmContainer.appendChild(btn);
       });
@@ -616,7 +610,6 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       buildWaveform();
-      selectLead(leadsData[0].id);
       document.getElementById('btnRefreshLeads').addEventListener('click', fetchLiveLeads);
       document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
       document.getElementById('searchInput').addEventListener('input', renderLeadList);
